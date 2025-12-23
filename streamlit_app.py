@@ -14,6 +14,10 @@ import requests
 from typing import Dict, List, Optional
 import time
 import math
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Page configuration
 st.set_page_config(
@@ -241,12 +245,21 @@ class AfricaEnergyAI:
     def _get_api_key(self):
         """Safely get API key from multiple sources"""
         try:
-            # Try Streamlit secrets first
+            # Try Streamlit secrets first (for cloud deployment)
             if hasattr(st, 'secrets') and "OPENROUTER_API_KEY" in st.secrets:
-                return st.secrets["OPENROUTER_API_KEY"]
-            # Try environment variable
-            return os.getenv("OPENROUTER_API_KEY", "")
-        except:
+                key = st.secrets["OPENROUTER_API_KEY"]
+                if key and key != "your-openrouter-api-key-here":
+                    return key
+            
+            # Try environment variable (for local development)
+            key = os.getenv("OPENROUTER_API_KEY", "")
+            if key and key != "your-openrouter-api-key-here":
+                return key
+                
+            return ""
+        except Exception as e:
+            if st.secrets.get("DEBUG", "false").lower() == "true":
+                st.error(f"🔧 Debug: API key error - {str(e)}")
             return ""
     
     def _test_api_connection(self):
@@ -282,16 +295,37 @@ class AfricaEnergyAI:
         }
     
     def _get_site_url(self):
+        """Get site URL from secrets or environment"""
         try:
-            return st.secrets.get("SITE_URL", "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/")
+            # Try Streamlit secrets first
+            if hasattr(st, 'secrets') and "SITE_URL" in st.secrets:
+                return st.secrets["SITE_URL"]
+            # Try environment variable
+            return os.getenv("SITE_URL", "http://localhost:8501")
         except:
-            return "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/"
+            return "http://localhost:8501"
     
     def _get_site_name(self):
+        """Get site name from secrets or environment"""
         try:
-            return st.secrets.get("SITE_NAME", "EnergySense AI")
+            # Try Streamlit secrets first
+            if hasattr(st, 'secrets') and "SITE_NAME" in st.secrets:
+                return st.secrets["SITE_NAME"]
+            # Try environment variable
+            return os.getenv("SITE_NAME", "EnergySense AI")
         except:
             return "EnergySense AI"
+    
+    def _get_debug_mode(self):
+        """Get debug mode from secrets or environment"""
+        try:
+            # Try Streamlit secrets first
+            if hasattr(st, 'secrets') and "DEBUG" in st.secrets:
+                return st.secrets["DEBUG"].lower() == "true"
+            # Try environment variable
+            return os.getenv("DEBUG", "false").lower() == "true"
+        except:
+            return False
     
     def get_response(self, user_message, context):
         """Get AI response with comprehensive error handling"""
