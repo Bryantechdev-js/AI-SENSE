@@ -54,7 +54,7 @@ python run_production.py
 ## 🌍 Supported Countries
 25 African countries with real tariff data:
 - Nigeria, South Africa, Egypt, Kenya, Ghana
-- Morocco, Ethiopia, Tanzania, Uganda, Algeria
+- Morocco, Ethiopia, Tanzania, Uganda, Algeria,cameroon
 - And 15 more...
 
 ## 📊 Key Features
