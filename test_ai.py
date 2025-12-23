@@ -3,15 +3,35 @@ Test script for AI functionality
 """
 import requests
 import os
+import streamlit as st
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+def get_api_key():
+    """Get API key from secrets or environment"""
+    try:
+        # Try Streamlit secrets first (for cloud deployment)
+        if hasattr(st, 'secrets') and "OPENROUTER_API_KEY" in st.secrets:
+            return st.secrets["OPENROUTER_API_KEY"]
+        # Try environment variable (for local development)
+        return os.getenv("OPENROUTER_API_KEY", "")
+    except:
+        return os.getenv("OPENROUTER_API_KEY", "")
 
 def test_openrouter_api():
     """Test OpenRouter API directly"""
-    api_key = "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"
+    api_key = get_api_key()
+    
+    if not api_key:
+        print("No API key found in environment or secrets")
+        return False
     
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/" or "http://localhost:8501/",
+        "HTTP-Referer": "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/",
         "X-Title": "EnergySense AI"
     }
     
