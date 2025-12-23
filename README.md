@@ -7,34 +7,31 @@
 pip install -r requirements.txt
 ```
 
-### 2. Configure OpenAI API (Required for AI Assistant)
+### 2. Configure API Key (Optional - for AI Assistant)
 
-#### Option A: Create .env file
+#### Option A: Local Development (.env file)
 1. Copy `.env.example` to `.env`
-2. Edit `.env` and add your OpenAI API key:
+2. Edit `.env` and add your OpenRouter API key:
 ```
-OPENAI_API_KEY=sk-your-actual-openai-api-key-here
-```
-
-#### Option B: Set Environment Variable
-**Windows:**
-```cmd
-set OPENAI_API_KEY=sk-your-actual-openai-api-key-here
+OPENROUTER_API_KEY=sk-or-v1-your-actual-api-key-here
 ```
 
-**Linux/Mac:**
-```bash
-export OPENAI_API_KEY=sk-your-actual-openai-api-key-here
+#### Option B: Streamlit Cloud Deployment
+1. Go to your Streamlit Cloud app settings
+2. Add secrets in the "Secrets" section:
+```toml
+OPENROUTER_API_KEY = "sk-or-v1-your-actual-api-key-here"
+SITE_URL = "https://your-app-url.streamlit.app/"
 ```
 
-### 3. Get OpenAI API Key
-1. Go to https://platform.openai.com/api-keys
+### 3. Get OpenRouter API Key (Optional)
+1. Go to https://openrouter.ai/keys
 2. Create a new API key
-3. Copy the key (starts with `sk-`)
+3. Copy the key (starts with `sk-or-v1-`)
 
 ### 4. Launch Application
 ```bash
-python run_production.py
+streamlit run streamlit_app.py
 ```
 
 ## 🔧 Features
@@ -44,27 +41,33 @@ python run_production.py
 - Bill Calculations
 - Real-time Simulation
 - Analytics Dashboard
+- **Smart Fallback Responses** (Works offline!)
 
 ### 🤖 With API Key
-- **AI Energy Assistant** (ChatGPT-powered)
+- **AI Energy Assistant** (OpenRouter-powered)
 - Personalized recommendations
 - Advanced energy analysis
 - Natural language queries
 
+## 🔒 Security Features
+- API keys stored in environment variables
+- No sensitive data in code repository
+- Secure fallback when API unavailable
+- Local processing for privacy
+
 ## 🌍 Supported Countries
-25 African countries with real tariff data:
-- Nigeria, South Africa, Egypt, Kenya, Ghana
-- Morocco, Ethiopia, Tanzania, Uganda, Algeria
-- And 15 more...
+5 African countries with real tariff data:
+- Cameroon, Nigeria, Kenya, Ghana, South Africa
 
 ## 📊 Key Features
 - **Multi-device management** with quantities
 - **Real-time simulation** like a driving simulator
-- **ChatGPT-like AI interface** for energy consulting
+- **AI-like interface** with smart fallback responses
 - **Comprehensive analytics** with KPIs
 - **African-focused** billing calculations
+- **Mobile-first design** for accessibility
 
-## 🔒 Security
-- API keys stored in environment variables
-- No sensitive data transmitted
-- Local processing for privacy"# AI-SENSE" 
+## 🚫 Important Security Notes
+- Never commit `.env` or `secrets.toml` files with real API keys
+- Use `.env.example` as template
+- The app works fully without API keys using intelligent fallback responses
