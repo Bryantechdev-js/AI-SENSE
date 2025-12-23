@@ -231,149 +231,239 @@ if 'income_level' not in st.session_state:
 if 'language' not in st.session_state:
     st.session_state.language = "English"
 
-# AI Integration with fallback
+# Production-ready AI Integration
 class AfricaEnergyAI:
     def __init__(self):
-        self.api_key = st.secrets.get("OPENROUTER_API_KEY", "")
-        self.enabled = bool(self.api_key)
+        self.api_key = self._get_api_key()
+        self.enabled = self._test_api_connection()
+        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        
+    def _get_api_key(self):
+        """Safely get API key from multiple sources"""
+        try:
+            # Try Streamlit secrets first
+            if hasattr(st, 'secrets') and "OPENROUTER_API_KEY" in st.secrets:
+                return st.secrets["OPENROUTER_API_KEY"]
+            # Try environment variable
+            return os.getenv("OPENROUTER_API_KEY", "")
+        except:
+            return ""
+    
+    def _test_api_connection(self):
+        """Test API connection on initialization"""
+        if not self.api_key:
+            return False
+        
+        try:
+            headers = self._get_headers()
+            test_payload = {
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 5
+            }
+            
+            response = requests.post(
+                self.base_url,
+                headers=headers,
+                json=test_payload,
+                timeout=5
+            )
+            return response.status_code == 200
+        except:
+            return False
+    
+    def _get_headers(self):
+        """Get API headers with all required fields"""
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": self._get_site_url(),
+            "X-Title": self._get_site_name()
+        }
+    
+    def _get_site_url(self):
+        try:
+            return st.secrets.get("SITE_URL", "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/")
+        except:
+            return "https://ai-sense-43djhny8ihhq2rvudnp974.streamlit.app/"
+    
+    def _get_site_name(self):
+        try:
+            return st.secrets.get("SITE_NAME", "EnergySense AI")
+        except:
+            return "EnergySense AI"
     
     def get_response(self, user_message, context):
-        """Get AI response with Africa-specific context"""
-        if self.enabled:
-            try:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                system_prompt = f"""You are an energy advisor for low-income African households in {context['country']}.
-                
-                Context:
-                - Monthly budget: {context['budget']} {context['currency']}
-                - Household size: {context['household_size']} people
-                - Income level: {context['income_level']}
-                - Grid stability: {context['grid_stability']*100:.0f}%
-                
-                Provide practical, affordable advice in simple language. Focus on:
-                - Immediate cost savings
-                - Device efficiency tips
-                - Budget management
-                - Prepaid meter optimization
-                - Solar/battery alternatives for power outages
-                
-                Keep responses under 150 words, use simple language."""
-                
-                payload = {
-                    "model": "openai/gpt-4o-mini",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_message}
-                    ],
-                    "max_tokens": 300,
-                    "temperature": 0.7
-                }
-                
-                response = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    return response.json()['choices'][0]['message']['content']
-            except:
-                pass
+        """Get AI response with comprehensive error handling"""
+        if not self.enabled:
+            return self.get_fallback_response(user_message, context)
+        
+        try:
+            headers = self._get_headers()
+            
+            system_prompt = f"""You are an energy advisor for African households in {context['country']}.
+            
+Context: Budget {context['budget']} {context['currency']}, {context['household_size']} people, {context['income_level']} income.
+            
+Provide practical advice in simple language under 100 words focusing on immediate savings."""
+            
+            payload = {
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                "max_tokens": 200,
+                "temperature": 0.7
+            }
+            
+            response = requests.post(
+                self.base_url,
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result and result['choices']:
+                    return result['choices'][0]['message']['content']
+            
+            # Log error for debugging
+            error_msg = f"API Error {response.status_code}: {response.text[:100]}"
+            if st.secrets.get("DEBUG", "false").lower() == "true":
+                st.error(f"🔧 Debug: {error_msg}")
+            
+        except requests.exceptions.Timeout:
+            if st.secrets.get("DEBUG", "false").lower() == "true":
+                st.warning("🔧 Debug: API timeout")
+        except Exception as e:
+            if st.secrets.get("DEBUG", "false").lower() == "true":
+                st.error(f"🔧 Debug: {str(e)}")
         
         return self.get_fallback_response(user_message, context)
     
     def get_fallback_response(self, user_message, context):
-        """Intelligent fallback responses for Africa"""
+        """Enhanced intelligent fallback responses"""
         budget = context['budget']
         currency = context['currency']
         country = context['country']
+        msg_lower = user_message.lower()
         
-        if "save" in user_message.lower() or "reduce" in user_message.lower():
-            return f"""💡 **Energy Saving Tips for {country}:**
+        # Energy saving responses
+        if any(word in msg_lower for word in ["save", "reduce", "lower", "cut", "decrease"]):
+            return f"""💡 **Top Energy Savings for {country}:**
 
-**Quick Wins:**
+**Immediate Actions:**
 • Switch to LED bulbs → Save 70% on lighting
 • Use fans instead of AC → Save {currency}2000+/month
-• Unplug devices when not using → Save 10%
-• Cook with gas when possible → Reduce electric bill
+• Unplug devices when not using → Save 10-15%
+• Iron clothes in batches → Reduce usage time
 
-**Budget Management:**
-• Set daily limit: {currency}{budget//30:.0f}
-• Check meter daily if prepaid
-• Use most power during off-peak hours
+**Smart Usage:**
+• Charge phones during day (cheaper rates)
+• Use natural light when possible
+• Cook multiple meals together
 
-**Power Outage Prep:**
-• Charge phones during grid hours
-• Consider small solar light ({currency}3000-5000)"""
+**Budget Impact:** These changes can save {currency}{int(budget*0.3)}/month!"""
 
-        elif "budget" in user_message.lower() or "money" in user_message.lower():
-            return f"""💰 **Budget Management for {currency}{budget}/month:**
+        # Budget management
+        elif any(word in msg_lower for word in ["budget", "money", "cost", "afford", "expensive"]):
+            daily_budget = budget // 30
+            return f"""💰 **Smart Budget Management:**
 
-**Daily Budget:** {currency}{budget//30:.0f}
-**Weekly Budget:** {currency}{budget//4:.0f}
+**Your Budget Breakdown:**
+• Daily limit: {currency}{daily_budget}
+• Weekly target: {currency}{budget//4}
+• Emergency reserve: {currency}{int(budget*0.2)}
 
 **Priority Spending:**
-1. Lighting (LED bulbs) - {currency}{budget*0.3:.0f}
-2. Phone charging - {currency}{budget*0.1:.0f}
-3. Fan/cooling - {currency}{budget*0.4:.0f}
-4. Entertainment - {currency}{budget*0.2:.0f}
+1. Essential lighting: {currency}{int(budget*0.25)}
+2. Phone/communication: {currency}{int(budget*0.15)}
+3. Cooling/comfort: {currency}{int(budget*0.35)}
+4. Entertainment: {currency}{int(budget*0.25)}
 
 **Warning Signs:**
-• Using more than {currency}{budget//20:.0f}/day
-• Frequent power cuts affecting budget
-• Old appliances consuming too much
+• Spending over {currency}{int(daily_budget*1.5)}/day
+• Frequent power meter top-ups
+• Using high-power devices during peak hours"""
 
-**Emergency Plan:**
-• Keep {currency}{budget*0.2:.0f} for unexpected outages"""
+        # Device recommendations
+        elif any(word in msg_lower for word in ["device", "appliance", "buy", "purchase", "recommend"]):
+            return f"""🔌 **Best Devices for {country}:**
 
-        elif "device" in user_message.lower() or "appliance" in user_message.lower():
-            return f"""🔌 **Smart Device Choices for {country}:**
+**Most Efficient (Buy First):**
+• LED bulbs: 9W, saves {currency}500/month
+• Table fan: 45W, much cheaper than AC
+• Phone charger: 5W, very efficient
+• Radio: 15W, entertainment + news
 
-**Most Efficient:**
-• LED bulbs: 9W vs 60W traditional
-• Table fan: 45W vs 800W small AC
-• Phone charger: 5W (very efficient)
-
-**Biggest Energy Users:**
-• Electric kettle: 1500W (use briefly)
-• Iron: 1000W (iron many clothes together)
-• Small AC: 800W (use sparingly)
-
-**Best Value Devices:**
-• LED bulb: {currency}3000, saves {currency}500/month
-• Table fan: {currency}25000, saves vs AC
-• Solar torch: {currency}5000, backup lighting
-
-**Avoid if Budget Tight:**
-• Old refrigerators (high consumption)
+**Avoid if Budget is Tight:**
+• Old refrigerators (120W+ continuous)
+• Electric kettles (1500W, use briefly)
 • Multiple TVs
-• Electric heaters"""
+• Electric heaters
 
+**Smart Buying Tips:**
+• Check power rating (lower watts = less cost)
+• Buy energy-efficient models
+• Consider solar alternatives for lighting
+• Look for timer switches"""
+
+        # Power outage help
+        elif any(word in msg_lower for word in ["outage", "blackout", "power cut", "load shedding", "grid"]):
+            return f"""⚡ **Power Outage Solutions for {country}:**
+
+**Immediate Preparation:**
+• Charge all devices during grid hours
+• Keep flashlights/torches ready
+• Store water when pumps work
+• Cook meals when power available
+
+**Backup Options:**
+• Solar torch: {currency}3000-5000
+• Power bank: {currency}8000-15000
+• Small solar panel: {currency}20000-40000
+• Battery radio: {currency}5000-8000
+
+**During Outages:**
+• Use battery devices sparingly
+• Avoid opening fridge frequently
+• Use natural ventilation
+• Plan activities around power schedule"""
+
+        # General help
         else:
             return f"""🏠 **Energy Assistant for {country}**
 
-I help families manage electricity costs and stay within budget.
+I help families manage electricity costs effectively!
 
-**I can help with:**
-• Reducing your monthly bill
+**I can help you with:**
+• Reducing monthly bills
 • Choosing efficient devices
-• Managing prepaid meters
-• Planning for power outages
-• Solar alternatives
+• Managing tight budgets
+• Preparing for power outages
+• Finding solar alternatives
 
-**Your Situation:**
+**Your Profile:**
 • Budget: {currency}{budget}/month
 • Country: {country}
-• Grid reliability: {context['grid_stability']*100:.0f}%
+• Household: {context['household_size']} people
 
-**Quick Tip:** Start with LED bulbs - easiest way to save money immediately!
+**Quick Tips:**
+• Start with LED bulbs for instant savings
+• Use fans instead of AC when possible
+• Unplug devices when not in use
+• Check your meter daily
 
-Ask me: "How can I save money?" or "What devices should I buy?""""
+**Ask me:** "How can I save money?" or "What devices should I avoid?""""
+
+    def get_status_message(self):
+        """Get current AI status for display"""
+        if self.enabled:
+            return "🤖 AI Assistant: Online", "success"
+        else:
+            return "🤖 Smart Assistant: Ready (Offline mode)", "info"
 
 # Core calculation functions
 def calculate_device_energy(power_w, hours_day, days_month, quantity=1):
@@ -463,8 +553,12 @@ def predict_monthly_cost(devices, country, days_elapsed=15):
     
     return predicted_monthly
 
-# Initialize AI
-africa_ai = AfricaEnergyAI()
+# Initialize AI system
+@st.cache_resource
+def initialize_ai():
+    return AfricaEnergyAI()
+
+africa_ai = initialize_ai()
 
 # Sidebar - Mobile-optimized
 with st.sidebar:
@@ -716,6 +810,13 @@ elif page == "🤖 Energy Assistant":
     </div>
     """, unsafe_allow_html=True)
     
+    # AI Status
+    status_msg, status_type = africa_ai.get_status_message()
+    if status_type == "success":
+        st.success(status_msg)
+    else:
+        st.info(status_msg)
+    
     # Chat interface
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
@@ -728,50 +829,72 @@ elif page == "🤖 Energy Assistant":
     
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Quick questions
+    st.markdown("### 💬 Quick Questions")
+    quick_questions = [
+        "How can I save money on electricity?",
+        "What devices use the most power?",
+        "Help me stay within my budget",
+        "Best devices for my budget?"
+    ]
+    
+    cols = st.columns(2)
+    for i, question in enumerate(quick_questions):
+        with cols[i % 2]:
+            if st.button(question, key=f"quick_{i}", use_container_width=True):
+                # Process question
+                st.session_state.chat_history.append({"type": "user", "content": question})
+                
+                context = {
+                    'country': st.session_state.country,
+                    'budget': st.session_state.monthly_budget,
+                    'currency': currency,
+                    'household_size': st.session_state.household_size,
+                    'income_level': st.session_state.income_level,
+                    'grid_stability': AFRICAN_COUNTRIES[st.session_state.country]['grid_stability']
+                }
+                
+                with st.spinner("🤖 Getting advice..."):
+                    ai_response = africa_ai.get_response(question, context)
+                
+                st.session_state.chat_history.append({"type": "ai", "content": ai_response})
+                st.rerun()
+    
     # Chat input
-    user_input = st.text_input("💬 Ask me anything about saving energy:", placeholder="How can I reduce my electricity bill?")
-    
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        # Quick question buttons
-        quick_questions = [
-            "How can I save money?",
-            "What devices use most power?",
-            "Help me stay in budget",
-            "Best devices to buy?"
-        ]
+    with st.form("chat_form", clear_on_submit=True):
+        user_input = st.text_input(
+            "💬 Ask me anything about saving energy:", 
+            placeholder="Type your question here..."
+        )
+        submitted = st.form_submit_button("Send", type="primary", use_container_width=True)
         
-        cols = st.columns(2)
-        for i, question in enumerate(quick_questions):
-            with cols[i % 2]:
-                if st.button(question, key=f"quick_{i}"):
-                    user_input = question
+        if submitted and user_input:
+            # Add user message
+            st.session_state.chat_history.append({"type": "user", "content": user_input})
+            
+            # Prepare context
+            context = {
+                'country': st.session_state.country,
+                'budget': st.session_state.monthly_budget,
+                'currency': currency,
+                'household_size': st.session_state.household_size,
+                'income_level': st.session_state.income_level,
+                'grid_stability': AFRICAN_COUNTRIES[st.session_state.country]['grid_stability']
+            }
+            
+            # Get AI response
+            with st.spinner("🤖 Thinking..."):
+                ai_response = africa_ai.get_response(user_input, context)
+            
+            # Add AI response
+            st.session_state.chat_history.append({"type": "ai", "content": ai_response})
+            st.rerun()
     
-    with col2:
-        send_button = st.button("Send", type="primary", use_container_width=True)
-    
-    if (send_button or user_input) and user_input:
-        # Add user message
-        st.session_state.chat_history.append({"type": "user", "content": user_input})
-        
-        # Prepare context
-        context = {
-            'country': st.session_state.country,
-            'budget': st.session_state.monthly_budget,
-            'currency': currency,
-            'household_size': st.session_state.household_size,
-            'income_level': st.session_state.income_level,
-            'grid_stability': AFRICAN_COUNTRIES[st.session_state.country]['grid_stability']
-        }
-        
-        # Get AI response
-        with st.spinner("🤖 Thinking..."):
-            ai_response = africa_ai.get_response(user_input, context)
-        
-        # Add AI response
-        st.session_state.chat_history.append({"type": "ai", "content": ai_response})
-        st.rerun()
+    # Clear chat
+    if st.session_state.chat_history:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
 
 # BUDGET TRACKER PAGE
 elif page == "📊 Budget Tracker":
